@@ -6,7 +6,7 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
+# Install dependencies (faster and more reliable for CI/CD)
 RUN npm ci
 
 # Copy source code
