@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  # Redis для хранения секретов
+  redis:
+    image: redis:7-alpine
+    container_name: ares-redis
+    restart: always
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis-data:/data
+      - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
+    healthcheck:
+      test: ["CMD", "redis-cli", "--pass", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - ares-network
+    # Не публикуем порт наружу для безопасности
+
+  # API бэкенд
+  ares-api:
+    image: ghcr.io/savo4ka/ares-api:latest
+    container_name: ares-api
+    restart: always
+    environment:
+      - REDIS_HOST=redis:6379
+      - REDIS_PASSWORD
+      - REDIS_DB=0
+      - ENCRYPTION_KEY
+      - PORT=8080
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    networks:
+      - ares-network
+    # Не публикуем порт наружу, доступ только через nginx
+
+  # UI фронтенд
+  ares-ui:
+    image: ghcr.io/savo4ka/ares-ui:latest
+    container_name: ares-ui
+    restart: always
+    ports:
+      - "127.0.0.1:3000:80"  # Слушаем только на localhost
+    depends_on:
+      ares-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    networks:
+      - ares-network
+    # Опционально: ограничение ресурсов
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+
+networks:
+  ares-network:
+    driver: bridge
+
+volumes:
+  redis-data:
