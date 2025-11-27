@@ -1,11 +1,9 @@
-version: '3.8'
-
 services:
   ares-ui:
     build:
       context: .
       dockerfile: Dockerfile
-    image: ares-ui:latest
+    image: ghcr.io/savo4ka/ares-ui:latest
     container_name: ares-ui
     restart: unless-stopped
     ports:
@@ -17,10 +15,10 @@ services:
       retries: 3
       start_period: 5s
     networks:
-      - ares-api
+      - ares-service
 
 networks:
-  ares-api:
-    name: ares-api
+  ares-service:
+    name: ares-service
     driver: bridge
     external: true
