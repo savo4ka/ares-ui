@@ -69,21 +69,27 @@
             />
             <button
               v-if="generatedUrl"
-              @click="toggleUrlVisibility"
-              class="visibility-toggle"
-              aria-label="Toggle URL visibility"
+              @click="copyToClipboard"
+              class="copy-icon-button"
+              aria-label="Copy URL"
             >
-              <svg v-if="isUrlVisible" class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                <circle cx="12" cy="12" r="3"/>
-              </svg>
-              <svg v-else class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-                <line x1="1" y1="1" x2="23" y2="23"/>
+              <svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
               </svg>
             </button>
           </div>
         </div>
+
+        <!-- Toast notification -->
+        <transition name="toast">
+          <div v-if="showToast" class="toast">
+            <svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M20 6L9 17l-5-5"/>
+            </svg>
+            Ссылка скопирована!
+          </div>
+        </transition>
 
         <div class="expiration-buttons">
           <button
@@ -100,13 +106,6 @@
             :disabled="!secretContent || isLoading"
           >
             {{ isLoading ? 'Создание...' : 'Создать ссылку' }}
-          </button>
-          <button
-            v-if="generatedUrl"
-            @click="copyToClipboard"
-            class="action-button secondary"
-          >
-            {{ copied ? 'Скопировано!' : 'Скопировать ссылку' }}
           </button>
         </div>
 
@@ -128,19 +127,14 @@ const { isDark, toggleTheme } = useTheme()
 const secretContent = ref('')
 const selectedExpiration = ref(72)
 const generatedUrl = ref('')
-const isUrlVisible = ref(true)
 const isLoading = ref(false)
-const copied = ref(false)
+const showToast = ref(false)
 const error = ref('')
 
 const clearContent = () => {
   secretContent.value = ''
   generatedUrl.value = ''
   error.value = ''
-}
-
-const toggleUrlVisibility = () => {
-  isUrlVisible.value = !isUrlVisible.value
 }
 
 const createSecret = async () => {
@@ -171,13 +165,30 @@ const createSecret = async () => {
 
 const copyToClipboard = async () => {
   try {
-    await navigator.clipboard.writeText(generatedUrl.value)
-    copied.value = true
+    // Try modern clipboard API first
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(generatedUrl.value)
+    } else {
+      // Fallback for older browsers or insecure contexts
+      const textArea = document.createElement('textarea')
+      textArea.value = generatedUrl.value
+      textArea.style.position = 'fixed'
+      textArea.style.left = '-999999px'
+      textArea.style.top = '-999999px'
+      document.body.appendChild(textArea)
+      textArea.focus()
+      textArea.select()
+      document.execCommand('copy')
+      textArea.remove()
+    }
+
+    showToast.value = true
     setTimeout(() => {
-      copied.value = false
-    }, 2000)
+      showToast.value = false
+    }, 3000)
   } catch (err) {
     console.error('Failed to copy:', err)
+    alert('Не удалось скопировать ссылку. Попробуйте выделить текст вручную.')
   }
 }
 </script>
@@ -330,7 +341,7 @@ const copyToClipboard = async () => {
 }
 
 .clear-button,
-.visibility-toggle {
+.copy-icon-button {
   width: 2rem;
   height: 2rem;
   padding: 0.25rem;
@@ -346,9 +357,15 @@ const copyToClipboard = async () => {
 }
 
 .clear-button:hover,
-.visibility-toggle:hover {
+.copy-icon-button:hover {
   background-color: var(--bg-tertiary);
   color: var(--text-primary);
+}
+
+.copy-icon-button:active {
+  background-color: var(--accent-primary);
+  color: var(--text-button);
+  transform: scale(0.92);
 }
 
 .input {
@@ -372,7 +389,7 @@ const copyToClipboard = async () => {
   position: relative;
 }
 
-.link-input-wrapper .visibility-toggle {
+.link-input-wrapper .copy-icon-button {
   position: absolute;
   right: 0.5rem;
   top: 50%;
@@ -451,5 +468,49 @@ const copyToClipboard = async () => {
   background-color: #7F1D1D;
   border-color: #991B1B;
   color: #FEE2E2;
+}
+
+/* Toast notification */
+.toast {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  background-color: #10B981;
+  color: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  font-size: 0.875rem;
+  font-weight: 500;
+  z-index: 1000;
+}
+
+.dark .toast {
+  background-color: #059669;
+}
+
+.toast-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  stroke-width: 2.5;
+}
+
+/* Toast animation */
+.toast-enter-active,
+.toast-leave-active {
+  transition: all 0.3s ease;
+}
+
+.toast-enter-from {
+  opacity: 0;
+  transform: translateY(1rem);
+}
+
+.toast-leave-to {
+  opacity: 0;
+  transform: translateY(0.5rem);
 }
 </style>
