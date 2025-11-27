@@ -55,14 +55,25 @@
 
         <div class="secret-box">
           <div class="secret-content">{{ secretContent }}</div>
-          <button @click="copySecret" class="copy-button">
-            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-            </svg>
-            {{ copied ? 'Скопировано!' : 'Копировать' }}
-          </button>
         </div>
+
+        <button @click="copySecret" class="copy-button">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+          </svg>
+          Копировать секрет
+        </button>
+
+        <!-- Toast notification -->
+        <transition name="toast">
+          <div v-if="showToast" class="toast">
+            <svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M20 6L9 17l-5-5"/>
+            </svg>
+            Секрет успешно скопирован!
+          </div>
+        </transition>
 
         <div class="warning-box">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -111,7 +122,7 @@ const expiresAt = ref('')
 const isLoading = ref(true)
 const error = ref('')
 const errorTitle = ref('')
-const copied = ref(false)
+const showToast = ref(false)
 
 onMounted(async () => {
   const secretId = route.params.id
@@ -159,13 +170,30 @@ const formatDate = (dateString) => {
 
 const copySecret = async () => {
   try {
-    await navigator.clipboard.writeText(secretContent.value)
-    copied.value = true
+    // Try modern clipboard API first
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(secretContent.value)
+    } else {
+      // Fallback for older browsers or insecure contexts
+      const textArea = document.createElement('textarea')
+      textArea.value = secretContent.value
+      textArea.style.position = 'fixed'
+      textArea.style.left = '-999999px'
+      textArea.style.top = '-999999px'
+      document.body.appendChild(textArea)
+      textArea.focus()
+      textArea.select()
+      document.execCommand('copy')
+      textArea.remove()
+    }
+
+    showToast.value = true
     setTimeout(() => {
-      copied.value = false
-    }, 2000)
+      showToast.value = false
+    }, 3000)
   } catch (err) {
     console.error('Failed to copy:', err)
+    alert('Не удалось скопировать секрет. Попробуйте выделить текст вручную.')
   }
 }
 
@@ -324,26 +352,75 @@ const goHome = () => {
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;
-  margin-bottom: 1rem;
 }
 
 .copy-button {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.5rem 1rem;
+  padding: 0.75rem 1.5rem;
   background-color: var(--accent-primary);
   border: none;
-  border-radius: 0.375rem;
+  border-radius: 0.5rem;
   color: var(--text-button);
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
+  align-self: flex-start;
 }
 
 .copy-button:hover {
   background-color: var(--accent-hover);
+}
+
+.copy-button:active {
+  transform: scale(0.98);
+  background-color: var(--bg-button);
+}
+
+/* Toast notification */
+.toast {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  background-color: #10B981;
+  color: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  font-size: 0.875rem;
+  font-weight: 500;
+  z-index: 1000;
+}
+
+.dark .toast {
+  background-color: #059669;
+}
+
+.toast-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  stroke-width: 2.5;
+}
+
+/* Toast animation */
+.toast-enter-active,
+.toast-leave-active {
+  transition: all 0.3s ease;
+}
+
+.toast-enter-from {
+  opacity: 0;
+  transform: translateY(1rem);
+}
+
+.toast-leave-to {
+  opacity: 0;
+  transform: translateY(0.5rem);
 }
 
 .warning-box {
