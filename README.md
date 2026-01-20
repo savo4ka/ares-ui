@@ -5,7 +5,7 @@
 ## Описание
 
 Ares - это сервис для безопасной передачи конфиденциальной информации (паролей, учетных данных и т.д.). Каждый секрет:
-- Шифруется на стороне сервера (AES-128-CBC)
+- Шифруется на стороне сервера (AES-256-GCM)
 - Может быть прочитан только один раз
 - Автоматически удаляется после истечения срока действия (24, 48 или 72 часа)
 
@@ -18,39 +18,7 @@ Ares - это сервис для безопасной передачи конф
 
 ## Установка и запуск
 
-### Вариант 1: Docker Compose (рекомендуется)
-
-Самый простой способ запустить весь стек (UI + API + Redis):
-
-```bash
-# Скопируйте пример переменных окружения
-cp .env.example .env
-
-# Отредактируйте .env и установите ENCRYPTION_KEY (для production!)
-
-# Запустите все сервисы
-docker-compose up -d
-
-# Приложение будет доступно на http://localhost:3000
-```
-
-Сервисы:
-- **UI**: http://localhost:3000
-- **API**: http://localhost:8080
-- **Redis**: localhost:6379
-
-Остановка:
-```bash
-docker-compose down
-```
-
-Просмотр логов:
-```bash
-docker-compose logs -f ares-ui
-docker-compose logs -f ares-api
-```
-
-### Вариант 2: Только UI в Docker
+### Вариант 1: Только UI в Docker
 
 Если бэкэнд уже запущен отдельно:
 
@@ -62,7 +30,7 @@ docker build -t ares-ui:latest .
 docker run -d -p 3000:80 --name ares-ui ares-ui:latest
 ```
 
-### Вариант 3: Локальная разработка
+### Вариант 2: Локальная разработка
 
 ```bash
 # Установка зависимостей
@@ -100,25 +68,6 @@ proxy: {
 ### Docker
 
 В Docker-окружении проксирование настроено в `nginx.conf`. API запросы автоматически проксируются к сервису `ares-api:8080`.
-
-### Переменные окружения
-
-Создайте файл `.env` на основе `.env.example`:
-
-```bash
-# Redis Configuration
-REDIS_PASSWORD=
-REDIS_DB=0
-
-# Encryption Key (32 characters for AES-256)
-# ВАЖНО: Для production ОБЯЗАТЕЛЬНО измените этот ключ!
-ENCRYPTION_KEY=abcdef0123456789abcdef0123456789
-```
-
-**Важно для production:**
-- Сгенерируйте случайный 32-символьный ключ для `ENCRYPTION_KEY`
-- Установите пароль для Redis в `REDIS_PASSWORD`
-- Используйте HTTPS для публичного доступа
 
 ## Структура проекта
 
@@ -190,7 +139,7 @@ ares-ui/
 
 ## Дизайн
 
-Дизайн вдохновлен цветовой палитрой Claude.ai:
+Дизайн:
 - Акцентный цвет: оранжевый (#D97706, #F59E0B)
 - Поддержка светлой и темной темы
 - Минималистичный и понятный интерфейс
@@ -230,36 +179,40 @@ git push origin v1.0.0
 
 ### Docker Compose в Production
 
-1. Создайте `.env` файл с безопасными значениями:
-```bash
-REDIS_PASSWORD=<strong-random-password>
-ENCRYPTION_KEY=<32-character-random-key>
-```
-
-2. Используйте опубликованный образ:
+1. Создайте сертификаты и укажите путь к ним в `docker-compose.yml`:
 ```yaml
-ares-ui:
-  image: ghcr.io/savo4ka/ares-ui:latest
-  # ... остальная конфигурация
+# ... остальная конфигурация
+volumes:
+  - /path/to/cert/fullchain.pem:/etc/nginx/ssl/fullchain.pem:ro
+  - /path/to/key/privkey.key:/etc/nginx/ssl/privkey.key:ro
+# ... остальная конфигурация
 ```
 
-3. Настройте reverse proxy (nginx, traefik) с SSL:
+2. Укажите ваш домен (если отсутствует, то IP-адрес) в nginx.conf
 ```nginx
-server {
-    listen 443 ssl http2;
-    server_name ares.yourdomain.com;
+# ... остальная конфигурация
+server_name YOUR_DOMAIN;
+# ... остальная конфигурация
+```
 
-    ssl_certificate /path/to/cert.pem;
-    ssl_certificate_key /path/to/key.pem;
-
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
+3. Если backend находит на другой ноде, то изменить проксирование в `vite.config.js`:
+```javascript
+proxy: {
+  '/api': {
+    target: 'http://your-backend-url:port',
+    changeOrigin: true
+  }
 }
+```
+
+4. Запустите docker compose:
+```bash
+docker compose up -d
+```
+
+5. Посмотреть логи и убедиться в корректности запуска:
+```bash
+docker compose logs -f
 ```
 
 ## Разработка
@@ -297,6 +250,6 @@ docker-compose down -v
 docker-compose ps
 ```
 
-## Лицензия
+## Контакты
 
-MIT
+Email: praslov007@gmail.com

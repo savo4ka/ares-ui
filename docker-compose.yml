@@ -1,19 +1,20 @@
 services:
   ares-ui:
-    build:
-      context: .
-      dockerfile: Dockerfile
     image: ghcr.io/savo4ka/ares-ui:latest
     container_name: ares-ui
     restart: unless-stopped
     ports:
       - "80:80"
+      - "443:443"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80/health"]
       interval: 30s
       timeout: 3s
       retries: 3
       start_period: 5s
+    volumes:
+      - /path/to/cert/fullchain.pem:/etc/nginx/ssl/fullchain.pem:ro
+      - /path/to/key/privkey.key:/etc/nginx/ssl/privkey.key:ro
     networks:
       - ares-service
 
